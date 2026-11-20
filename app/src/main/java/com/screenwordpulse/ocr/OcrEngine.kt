@@ -34,7 +34,7 @@ class TesseractOcrEngine(context: Context, languages: String = "rus+kaz+eng") : 
         }
         ready = names.isNotEmpty() && api.init(tessDir.absolutePath, languages)
         if (ready) {
-            api.pageSegMode = TessBaseAPI.PSM_AUTO
+            api.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO)
         }
     }
 
@@ -46,7 +46,7 @@ class TesseractOcrEngine(context: Context, languages: String = "rus+kaz+eng") : 
         val w = bitmap.width.toFloat().coerceAtLeast(1f)
         val h = bitmap.height.toFloat().coerceAtLeast(1f)
         val out = ArrayList<OcrLine>()
-        val level = TessBaseAPI.RIL_TEXTLINE
+        val level = TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE
         try {
             it.begin()
             do {
@@ -70,6 +70,6 @@ class TesseractOcrEngine(context: Context, languages: String = "rus+kaz+eng") : 
     }
 
     override fun close() {
-        api.recycle()
+        api.end()
     }
 }
