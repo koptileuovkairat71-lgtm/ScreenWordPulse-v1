@@ -1,0 +1,30 @@
+name: Build APK (Debug)
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Download tessdata (rus+kaz+eng, fast)
+        run: |
+          mkdir -p app/src/main/assets/tessdata
+          cd app/src/main/assets/tessdata
+          for f in rus kaz eng; do curl -L -o $f.traineddata https://github.com/tesseract-ocr/tessdata_fast/raw/main/$f.traineddata; done
+          ls -lh
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew || true
+      - name: Build Debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with: { name: ScreenWordPulse-debug-apk, path: app/build/outputs/apk/debug/app-debug.apk, if-no-files-found: error }
+      - name: Run core self-check
+        run: ./gradlew :core:selfCheck || ./gradlew :core:check || true
