@@ -17,5 +17,5 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$camerax")
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
-    implementation("cz.adaptive:tesseract4android:4.7.0")
+    implementation("com.rmtheis:tess-two:9.1.0")
 }
