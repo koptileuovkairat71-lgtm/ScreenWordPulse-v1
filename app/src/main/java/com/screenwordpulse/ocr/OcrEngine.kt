@@ -14,41 +14,53 @@ interface OcrEngine {
 }
 
 /**
- * Tesseract (rus+kaz+eng). ML Kit для кириллицы не подходит — поэтому Tesseract.
- * Файлы rus/kaz/eng.traineddata (tessdata_fast) положить в app/src/main/assets/tessdata/.
+ * Tesseract (rus+kaz+eng) через tess-two.
+ * Файлы rus/kaz/eng.traineddata (tessdata_fast) кладутся в app/src/main/assets/tessdata/.
  */
 class TesseractOcrEngine(context: Context, languages: String = "rus+kaz+eng") : OcrEngine {
     private val api = TessBaseAPI()
     val ready: Boolean
 
     init {
-        val dir = File(context.filesDir, "tessdata").apply { mkdirs() }
+        val tessDir = File(context.filesDir, "tessdata").apply { mkdirs() }
         val names = context.assets.list("tessdata") ?: emptyArray()
         for (name in names) {
-            val out = File(dir, name)
-            if (!out.exists()) context.assets.open("tessdata/$name").use { i -> out.outputStream().use { o -> i.copyTo(o) } }
+            val out = File(tessDir, name)
+            if (!out.exists()) {
+                context.assets.open("tessdata/$name").use { input ->
+                    out.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
         }
-        ready = names.isNotEmpty() && api.init(context.filesDir.absolutePath, languages)
-        if (ready) api.pageSegMode = TessBaseAPI.PageSegMode.PSM_AUTO
+        ready = names.isNotEmpty() && api.init(tessDir.absolutePath, languages)
+        if (ready) {
+            api.pageSegMode = TessBaseAPI.PSM_AUTO
+        }
     }
 
     override fun recognize(bitmap: Bitmap): List<OcrLine> {
         if (!ready) return emptyList()
         api.setImage(bitmap)
-        api.getHOCRText(0)                       // запускает распознавание
+        api.getHOCRText(0)
         val it = api.resultIterator ?: return emptyList()
-        val w = bitmap.width.toFloat()
-        val h = bitmap.height.toFloat()
+        val w = bitmap.width.toFloat().coerceAtLeast(1f)
+        val h = bitmap.height.toFloat().coerceAtLeast(1f)
         val out = ArrayList<OcrLine>()
-        val level = TessBaseAPI.PageIteratorLevel.RIL_TEXTLINE
+        val level = TessBaseAPI.RIL_TEXTLINE
         try {
             it.begin()
             do {
                 val text = it.getUTF8Text(level)?.trim().orEmpty()
                 if (text.isNotEmpty()) {
                     val r = it.getBoundingRect(level)
-                    out.add(OcrLine(text, it.confidence(level) / 100f,
-                        NBox(r.left / w, r.top / h, r.right / w, r.bottom / h)))
+                    val conf = (it.confidence(level) / 100f).coerceIn(0f, 1f)
+                    out.add(
+                        OcrLine(
+                            text = text,
+                            confidence = conf,
+                            box = NBox(r.left / w, r.top / h, r.right / w, r.bottom / h)
+                        )
+                    )
                 }
             } while (it.next(level))
         } finally {
@@ -57,5 +69,7 @@ class TesseractOcrEngine(context: Context, languages: String = "rus+kaz+eng") : 
         return out
     }
 
-    override fun close() { api.recycle() }
+    override fun close() {
+        api.recycle()
+    }
 }
